@@ -136,7 +136,7 @@ ensure_libs() {
     ldconfig -p 2>/dev/null | grep -q 'libssl\.so\.3' || missing="$missing libssl3"
     if [ -n "$missing" ]; then
       say "installing$missing"
-      run apt-get update -qq && run env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends $missing >/dev/null \
+      run apt-get update -qq && run env DEBIAN_FRONTEND=noninteractive NEEDRESTART_SUSPEND=1 apt-get install -y -qq --no-install-recommends $missing >/dev/null \
         || say "warning: could not install$missing (libssl3t64 on newer Ubuntu?) — install it yourself if exec-mcp fails to start"
     fi
   fi
@@ -263,7 +263,7 @@ letsencrypt() {
 
   if ! command -v certbot >/dev/null 2>&1; then
     say "installing certbot"
-    if command -v apt-get >/dev/null 2>&1; then run apt-get update -qq && run env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq certbot >/dev/null
+    if command -v apt-get >/dev/null 2>&1; then run apt-get update -qq && run env DEBIAN_FRONTEND=noninteractive NEEDRESTART_SUSPEND=1 apt-get install -y -qq certbot >/dev/null
     elif command -v apk >/dev/null 2>&1; then run apk add --no-cache certbot >/dev/null
     elif command -v dnf >/dev/null 2>&1; then run dnf install -y -q certbot
     else die "install certbot, or pass --tls-cert/--tls-key"; fi
@@ -273,8 +273,10 @@ letsencrypt() {
     open_firewall 80 443
     if [ -n "$EMAIL" ]; then contact="--email $EMAIL"; else contact="--register-unsafely-without-email"; fi
     say "requesting a Let's Encrypt certificate for $host"
-    run certbot certonly --standalone --non-interactive --agree-tos --keep-until-expiring $contact -d "$host" >/dev/null \
-      || die "certbot failed (is port 80 reachable from the internet? cloud firewalls/security groups must allow 80 and 443)"
+    # --cert-name keeps this a separate lineage: certificates that already exist on the host stay untouched.
+    run certbot certonly --standalone --non-interactive --agree-tos --keep-until-expiring $contact \
+        --cert-name "$host" -d "$host" >/dev/null \
+      || die "certbot failed (its message is above). If it is the HTTP challenge: port 80 must be reachable from the internet, cloud firewalls/security groups must allow 80 and 443"
   fi
 
   # The service user cannot read /etc/letsencrypt/live; a deploy hook keeps a readable copy fresh after every renewal.

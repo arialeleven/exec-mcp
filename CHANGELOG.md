@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1
+
+- Installer: `--letsencrypt` requests a separate certificate (`--cert-name`), so certificates already on the host
+  are never touched. It used to stop on hosts with an existing certificate for the bare IP.
+- Installer: no `needrestart` noise during apt installs; a clearer message when certbot fails.
+
 ## 0.1.0
 
 First release.
