@@ -64,19 +64,13 @@ jobs:
         run: |
           docker run --rm -v "$PWD:/src" -w /src alpine:3.22 sh -c '
             apk add --no-cache python3 curl >/dev/null &&
-            sh install.sh --from /src/dist --examples &&
-            exec-mcp version && exec-mcp tools list &&
-            python3 tests/e2e/stdio_check.py /usr/local/bin/exec-mcp &&
-            sh install.sh --from /src/dist | grep -q "is current" &&
-            sh install.sh --uninstall && ! command -v exec-mcp'
+            sh tests/e2e/installer_check.sh /src/dist root'
 
       - name: Installer on Debian (glibc, non-root, private runtime)
         run: |
           docker run --rm -v "$PWD:/src" -w /src debian:bookworm-slim sh -c '
             apt-get update -qq && apt-get install -y -qq python3 curl ca-certificates libstdc++6 libssl3 >/dev/null &&
-            useradd -m u &&
-            su - u -c "sh /src/install.sh --from /src/dist && ~/.local/bin/exec-mcp version" &&
-            su - u -c "cd /tmp && python3 /src/tests/e2e/stdio_check.py ~/.local/bin/exec-mcp"'
+            useradd -m u && su - u -c "sh /src/tests/e2e/installer_check.sh /src/dist user"'
 
       - uses: actions/upload-artifact@v6
         with:
