@@ -41,7 +41,7 @@ LE=0 EMAIL="" EXTERNAL_URL="" TLS_CERT="" TLS_KEY="" NO_TLS=0 LISTEN="" WORKSPAC
 
 say() { printf '%s\n' "exec-mcp: $*"; }
 die() { printf '%s\n' "exec-mcp: error: $*" >&2; exit 1; }
-run() { if [ "$DRY" = 1 ]; then printf '  + %s\n' "$*"; else "$@"; fi; }
+run() { if [ "$DRY" = 1 ]; then printf '  + %s\n' "$*" >&2; else "$@"; fi; }   # dry-run lines go to stderr: callers may redirect stdout
 
 while [ $# -gt 0 ]; do
   case "$1" in
