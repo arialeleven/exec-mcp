@@ -49,10 +49,7 @@ and the runtime, keeps the previous version in `*.prev`, and restarts the servic
 ```sh
 … | sh -s -- --examples                 # also copy the example script tools to ~/.exec-mcp/tools
 … | sh -s -- --version v0.1.0           # a specific release
-… | sudo sh -s -- --service --external-url https://mcp.example.com \
-        --tls-cert /etc/letsencrypt/live/mcp.example.com/fullchain.pem \
-        --tls-key  /etc/letsencrypt/live/mcp.example.com/privkey.pem \
-        --workspace /srv/project --user exec-mcp   # remote mode as a systemd/OpenRC service
+… | sudo sh -s -- --service --letsencrypt   # claude.ai connector: HTTPS on 443, certificate, OAuth, service
 … | sh -s -- --uninstall
 ```
 
@@ -69,10 +66,22 @@ From source (.NET 10 SDK): `dotnet run --project src/ExecMcp -- --workspace /pat
 claude mcp add exec -- exec-mcp --workspace /path/to/project
 ```
 
-**claude.ai, Claude Desktop, mobile apps**: run exec-mcp in remote mode on a Linux server and add it as a custom
-connector; see [docs/remote.md](docs/remote.md). claude.ai only connects to public HTTPS on **port 443** from
-Anthropic's IPv4 egress range, so the server needs a public name, a certificate and port 443. With the installer's
-`--service` flags this is one command.
+**claude.ai, Claude Desktop, mobile apps**: on a Linux server with ports 80 and 443 free, one command sets up the
+whole connector:
+
+```sh
+curl -fsSL https://github.com/arialeleven/exec-mcp/releases/latest/download/install.sh | sudo sh -s -- --service --letsencrypt
+```
+
+- **Name and certificate.** It names the server `<public-ip>.sslip.io` (or use `--external-url`) and gets an
+  auto-renewing Let's Encrypt certificate.
+- **Service.** It starts a systemd/OpenRC service as the unprivileged user `exec-mcp` (`--user root` to administer
+  the host) with OAuth and the Anthropic-only allowlist.
+- **What to do next.** It prints the connector URL and the owner password. Add the URL in claude.ai under
+  **Settings → Connectors → Add custom connector**, then sign in with the password.
+
+claude.ai only connects to **port 443** over **IPv4**. More details, including how to share 443 with another
+service, are in [docs/remote.md](docs/remote.md).
 
 ## Add a tool in 30 seconds
 

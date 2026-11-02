@@ -23,5 +23,6 @@ First release.
 - **Distribution**:
   - one portable archive for every Linux (x64/arm64, glibc/musl);
   - `install.sh` for one-command install and update, which fetches a private .NET runtime when needed (SHA-512 verified) and sets up a systemd/OpenRC service;
+  - `--service --letsencrypt` turns a fresh server into a claude.ai connector in one command: `<ip>.sslip.io` name, auto-renewing certificate, ufw, port checks;
   - Linux CI with installer tests on Alpine and Debian.
 - Apache-2.0. Third-party licenses ship with every archive.

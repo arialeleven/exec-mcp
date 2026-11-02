@@ -18,7 +18,28 @@ IPv6: exec-mcp listens on both stacks, and your browser may use either for the s
 comes over IPv4. If your host only has IPv6, put an IPv4-reachable proxy in front, such as Cloudflare (proxied DNS),
 a tunnel, or another dual-stack machine.
 
-## Running it
+## One command on a fresh server
+
+```sh
+curl -fsSL https://github.com/arialeleven/exec-mcp/releases/latest/download/install.sh | sudo sh -s -- --service --letsencrypt
+```
+
+The command, in order:
+
+1. Installs exec-mcp (and a private .NET runtime if needed).
+2. Detects the public IPv4 and uses `https://<ip-with-dashes>.sslip.io`. Pass `--external-url https://your.name`
+   for your own domain.
+3. Installs certbot and gets a certificate through port 80. It installs a deploy hook that copies every renewal to
+   `/etc/exec-mcp/tls/`, where the service user can read it; exec-mcp reloads it by itself.
+4. Opens 80 and 443 in ufw if ufw is active. Cloud firewalls and security groups are up to you.
+5. Creates the `exec-mcp` user and a service listening on `:443` with `--anthropic-only`. The owner password goes
+   to `/etc/exec-mcp/env`.
+6. Prints the connector URL and the password.
+
+If port 443 is taken, it stops and says so; see "Sharing port 443" below. Re-running the same command updates
+exec-mcp and restarts the service.
+
+## Running it by hand
 
 ```bash
 exec-mcp --workspace /srv/project \

@@ -3,6 +3,10 @@
 #
 #   curl -fsSL https://github.com/arialeleven/exec-mcp/releases/latest/download/install.sh | sh
 #
+# A claude.ai connector on a fresh server (HTTPS on 443, certificate, OAuth, service) in one line:
+#
+#   curl -fsSL https://github.com/arialeleven/exec-mcp/releases/latest/download/install.sh | sudo sh -s -- --service --letsencrypt
+#
 # exec-mcp ships as one portable .NET archive. If the machine has no ASP.NET Core 10 runtime, the installer
 # downloads Microsoft's runtime (verified against the official SHA-512) into a private folder; nothing
 # system-wide is touched except, as root, missing base libraries (libstdc++, OpenSSL, CA certificates).
@@ -16,8 +20,11 @@
 #   --private-runtime    always use the private runtime, even if a suitable system one exists
 #   --examples           copy example script tools into ~/.exec-mcp/tools (existing files are kept)
 #   --service            run remote mode as a systemd/OpenRC service (root), with:
+#     --letsencrypt        get and auto-renew a Let's Encrypt certificate (certbot, needs port 80 once);
+#                          without --external-url the name is <public-ipv4>.sslip.io
+#     --email ADDR         contact address for Let's Encrypt (optional)
 #     --external-url URL   public https URL clients use (no port: claude.ai only connects to 443)
-#     --tls-cert/--tls-key PEM files; or --no-tls when a TLS proxy (sni-router, nginx) is in front
+#     --tls-cert/--tls-key PEM files you already have; or --no-tls when a TLS proxy (sni-router, nginx) is in front
 #     --listen ADDR        default :443 with TLS, 127.0.0.1:9443 with --no-tls
 #     --workspace DIR      default /srv/exec-mcp
 #     --user NAME          service user (default exec-mcp, created if missing; "root" to administer the host)
@@ -30,7 +37,7 @@ set -eu
 REPO="${EXEC_MCP_REPO:-arialeleven/exec-mcp}"
 DOTNET_CHANNEL=10.0
 VERSION=latest PREFIX="" BIN_DIR="" FROM="" PRIVATE_RT=0 EXAMPLES=0 SERVICE=0 UNINSTALL=0 DRY=0
-EXTERNAL_URL="" TLS_CERT="" TLS_KEY="" NO_TLS=0 LISTEN="" WORKSPACE=/srv/exec-mcp SVC_USER=exec-mcp PROXY=0 PASSWORD=""
+LE=0 EMAIL="" EXTERNAL_URL="" TLS_CERT="" TLS_KEY="" NO_TLS=0 LISTEN="" WORKSPACE=/srv/exec-mcp SVC_USER=exec-mcp PROXY=0 PASSWORD=""
 
 say() { printf '%s\n' "exec-mcp: $*"; }
 die() { printf '%s\n' "exec-mcp: error: $*" >&2; exit 1; }
@@ -54,9 +61,11 @@ while [ $# -gt 0 ]; do
     --user) SVC_USER=$2; shift ;;
     --proxy-protocol) PROXY=1 ;;
     --password) PASSWORD=$2; shift ;;
+    --letsencrypt) LE=1 ;;
+    --email) EMAIL=$2; shift ;;
     --uninstall) UNINSTALL=1 ;;
     --dry-run) DRY=1 ;;
-    -h|--help) sed -n '2,33p' "$0" 2>/dev/null || echo "see https://github.com/$REPO#install"; exit 0 ;;
+    -h|--help) sed -n '2,40p' "$0" 2>/dev/null || echo "see https://github.com/$REPO#install"; exit 0 ;;
     *) die "unknown option $1 (see --help)" ;;
   esac
   shift
@@ -230,15 +239,74 @@ if [ "$EXAMPLES" = 1 ]; then
 fi
 
 # ---- service (remote mode) ---------------------------------------------------------
+port_busy() { # port -> 0 when something listens on it
+  if command -v ss >/dev/null 2>&1; then ss -ltn | awk '{print $4}' | grep -qE "[:.]$1\$"
+  else netstat -ltn 2>/dev/null | awk '{print $4}' | grep -qE "[:.]$1\$"; fi
+}
+
+open_firewall() { # ports...
+  if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
+    for p in "$@"; do run ufw allow "$p/tcp" >/dev/null; done
+    say "ufw: opened $*"
+  fi
+}
+
+letsencrypt() {
+  if [ -z "$EXTERNAL_URL" ] || [ "$EXTERNAL_URL" = auto ]; then
+    # claude.ai connects over IPv4 only, so the name must resolve to the IPv4 address.
+    ip=$(fetch_text https://api.ipify.org 2>/dev/null | tr -d ' \r\n' || true)
+    echo "$ip" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' || die "could not detect the public IPv4 address; pass --external-url https://your.host"
+    EXTERNAL_URL="https://$(echo "$ip" | tr . -).sslip.io"
+    say "public name: $EXTERNAL_URL (sslip.io resolves it to $ip)"
+  fi
+  host=${EXTERNAL_URL#https://}; host=${host%%/*}; host=${host%%:*}
+
+  if ! command -v certbot >/dev/null 2>&1; then
+    say "installing certbot"
+    if command -v apt-get >/dev/null 2>&1; then run apt-get update -qq && run env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq certbot >/dev/null
+    elif command -v apk >/dev/null 2>&1; then run apk add --no-cache certbot >/dev/null
+    elif command -v dnf >/dev/null 2>&1; then run dnf install -y -q certbot
+    else die "install certbot, or pass --tls-cert/--tls-key"; fi
+  fi
+  if [ ! -d "/etc/letsencrypt/live/$host" ]; then
+    port_busy 80 && die "port 80 is in use; Let's Encrypt needs it for a moment. Stop that service and re-run, or pass --tls-cert/--tls-key"
+    open_firewall 80 443
+    if [ -n "$EMAIL" ]; then contact="--email $EMAIL"; else contact="--register-unsafely-without-email"; fi
+    say "requesting a Let's Encrypt certificate for $host"
+    run certbot certonly --standalone --non-interactive --agree-tos --keep-until-expiring $contact -d "$host" >/dev/null \
+      || die "certbot failed (is port 80 reachable from the internet? cloud firewalls/security groups must allow 80 and 443)"
+  fi
+
+  # The service user cannot read /etc/letsencrypt/live; a deploy hook keeps a readable copy fresh after every renewal.
+  hook=/etc/letsencrypt/renewal-hooks/deploy/exec-mcp.sh
+  HOOK="#!/bin/sh
+# Written by the exec-mcp installer: copies the renewed certificate for the exec-mcp service user.
+# exec-mcp notices the new file by itself; no restart is needed.
+set -e
+src=/etc/letsencrypt/live/$host
+[ -z \"\${RENEWED_LINEAGE:-}\" ] || [ \"\$RENEWED_LINEAGE\" = \"\$src\" ] || exit 0
+install -d -m 0750 -o $SVC_USER /etc/exec-mcp/tls
+install -m 0644 -o $SVC_USER \"\$src/fullchain.pem\" /etc/exec-mcp/tls/fullchain.pem
+install -m 0600 -o $SVC_USER \"\$src/privkey.pem\" /etc/exec-mcp/tls/privkey.pem"
+  if [ "$DRY" = 1 ]; then printf '%s\n' "$HOOK"; else
+    mkdir -p "$(dirname "$hook")"; printf '%s\n' "$HOOK" > "$hook"; chmod 755 "$hook"; RENEWED_LINEAGE="" "$hook"
+  fi
+
+  # certbot from apt/snap brings its own renewal timer; elsewhere add a daily job.
+  if ! { command -v systemctl >/dev/null 2>&1 && systemctl list-timers --all 2>/dev/null | grep -q certbot; }; then
+    if [ -d /etc/periodic/daily ]; then
+      [ "$DRY" = 1 ] || { printf '#!/bin/sh\ncertbot renew -q\n' > /etc/periodic/daily/certbot-renew; chmod 755 /etc/periodic/daily/certbot-renew; }
+    elif [ -d /etc/cron.d ]; then
+      [ "$DRY" = 1 ] || printf '17 3 * * * root certbot renew -q\n' > /etc/cron.d/certbot-exec-mcp
+    fi
+  fi
+  TLS_CERT=/etc/exec-mcp/tls/fullchain.pem
+  TLS_KEY=/etc/exec-mcp/tls/privkey.pem
+  say "certificate ready; renewals are automatic"
+}
+
 if [ "$SERVICE" = 1 ]; then
   [ "$IS_ROOT" = 1 ] || die "--service needs root"
-  [ -n "$EXTERNAL_URL" ] || die "--service needs --external-url https://your.host"
-  if [ "$NO_TLS" = 0 ]; then
-    [ -n "$TLS_CERT" ] && [ -n "$TLS_KEY" ] || die "--service needs --tls-cert and --tls-key (or --no-tls behind a TLS proxy)"
-    : "${LISTEN:=:443}"
-  else
-    : "${LISTEN:=127.0.0.1:9443}"
-  fi
   INIT=$(init_system)
   [ "$INIT" != none ] || die "neither systemd nor OpenRC found; run: exec-mcp --http … yourself"
 
@@ -249,6 +317,25 @@ if [ "$SERVICE" = 1 ]; then
   SVC_HOME=$(getent passwd "$SVC_USER" 2>/dev/null | cut -d: -f6); [ -n "$SVC_HOME" ] || SVC_HOME=/var/lib/exec-mcp
   run mkdir -p "$WORKSPACE" /etc/exec-mcp
   [ "$SVC_USER" = root ] || run chown "$SVC_USER" "$WORKSPACE"
+
+  [ "$LE" = 1 ] && letsencrypt
+  [ -n "$EXTERNAL_URL" ] || die "--service needs --letsencrypt or --external-url https://your.host"
+  if [ "$NO_TLS" = 0 ]; then
+    [ -n "$TLS_CERT" ] && [ -n "$TLS_KEY" ] || die "--service needs --letsencrypt, or --tls-cert and --tls-key (or --no-tls behind a TLS proxy)"
+    : "${LISTEN:=:443}"
+  else
+    : "${LISTEN:=127.0.0.1:9443}"
+  fi
+  svc_running=0
+  case "$INIT" in
+    systemd) systemctl is-active --quiet exec-mcp 2>/dev/null && svc_running=1 ;;
+    openrc) [ -f /etc/init.d/exec-mcp ] && rc-service exec-mcp status >/dev/null 2>&1 && svc_running=1 ;;
+  esac
+  lport=${LISTEN##*:}
+  if [ "$svc_running" = 0 ] && port_busy "$lport"; then
+    die "port $lport is already in use. claude.ai only connects to 443: free it, or share it with deploy/sni-router (see docs/remote.md)"
+  fi
+  [ "$lport" = 443 ] && open_firewall 443
 
   if [ ! -f /etc/exec-mcp/env ] || [ -n "$PASSWORD" ]; then
     [ -n "$PASSWORD" ] || PASSWORD=$(head -c 18 /dev/urandom | base64 | tr '+/' 'xy')

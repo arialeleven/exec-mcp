@@ -47,6 +47,15 @@ jobs:
           sh install.sh --from "$PWD/dist" --prefix /tmp/x/exec-mcp --bin-dir /tmp/x/bin
           python3 tests/e2e/stdio_check.py /tmp/x/bin/exec-mcp
 
+      - name: Connector setup on systemd (dry run of --service --letsencrypt)
+        run: |
+          out=$(sudo sh install.sh --from "$PWD/dist" --dry-run --service --letsencrypt 2>&1) || { echo "$out"; exit 1; }
+          echo "$out"
+          echo "$out" | grep -q "sslip.io (sslip.io resolves it to"
+          echo "$out" | grep -q "certbot certonly --standalone"
+          echo "$out" | grep -q "ExecStart=/usr/local/bin/exec-mcp --workspace /srv/exec-mcp --http :443"
+          echo "$out" | grep -q "AmbientCapabilities=CAP_NET_BIND_SERVICE"
+
       - name: Plugin conformance (examples)
         run: |
           export EXEC_MCP_HOME=$(mktemp -d)
