@@ -1,0 +1,21 @@
+#!/sbin/openrc-run
+# exec-mcp as an OpenRC service. Copy to /etc/init.d/exec-mcp, adjust command_args and command_user,
+# then: rc-update add exec-mcp default && rc-service exec-mcp start
+name="exec-mcp"
+description="exec-mcp MCP server"
+command="/opt/exec-mcp/exec-mcp"
+command_args="--workspace /srv/project --http 127.0.0.1:9443 --external-url https://mcp.example.com --tls-cert /etc/exec-mcp/tls/fullchain.pem --tls-key /etc/exec-mcp/tls/privkey.pem --anthropic-only --proxy-protocol"
+command_user="exec-mcp:exec-mcp"        # an unprivileged user; use root only if you mean to administer the host
+directory="/srv/project"
+supervisor="supervise-daemon"
+supervise_daemon_args="--env HOME=/var/lib/exec-mcp --env EXEC_MCP_HOME=/var/lib/exec-mcp/.exec-mcp"
+respawn_delay=3
+output_log="/var/log/exec-mcp.log"
+error_log="/var/log/exec-mcp.log"
+
+depend() { need net; after firewall; }
+
+start_pre() {
+  checkpath -d -m 0700 -o exec-mcp:exec-mcp /var/lib/exec-mcp
+  checkpath -f -m 0600 -o exec-mcp:exec-mcp /var/log/exec-mcp.log
+}

@@ -1,0 +1,7 @@
+{
+  "listen": [":443"],
+  "routes": {
+    "mcp.example.com": { "addr": "127.0.0.1:9443", "proxy_protocol": true }
+  },
+  "default": { "addr": "127.0.0.1:8444", "proxy_protocol": false }
+}

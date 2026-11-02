@@ -1,0 +1,13 @@
+{
+  // ~/.exec-mcp/config.json — every key is optional; see docs/configuration.md
+  "bash": {
+    "allow": ["git status", "git diff", "ls", "cat"],
+    "deny": ["mkfs", "shutdown", "reboot"],
+    "askWithoutElicitation": "deny"
+  },
+  "tools": {
+    "disabled": ["TodoWrite"],
+    "protected": ["~/.ssh/**", "~/.aws/**", "/etc/shadow"]
+  },
+  "untrustedWrap": true
+}

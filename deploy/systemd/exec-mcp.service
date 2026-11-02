@@ -1,0 +1,29 @@
+# exec-mcp as a systemd service. Copy to /etc/systemd/system/, adjust, then:
+#   systemctl daemon-reload && systemctl enable --now exec-mcp
+[Unit]
+Description=exec-mcp MCP server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=exec-mcp
+Group=exec-mcp
+WorkingDirectory=/srv/project
+Environment=HOME=/var/lib/exec-mcp
+EnvironmentFile=-/etc/exec-mcp/env
+# EXEC_MCP_PASSWORD=... goes into /etc/exec-mcp/env (mode 600)
+ExecStart=/opt/exec-mcp/exec-mcp --workspace /srv/project --http 127.0.0.1:9443 \
+  --external-url https://mcp.example.com \
+  --tls-cert /etc/exec-mcp/tls/fullchain.pem --tls-key /etc/exec-mcp/tls/privkey.pem \
+  --anthropic-only --proxy-protocol
+Restart=on-failure
+RestartSec=3
+StateDirectory=exec-mcp
+# Hardening that keeps a useful shell: no new privileges, read-only system, writable project and home.
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/srv/project /var/lib/exec-mcp /tmp
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

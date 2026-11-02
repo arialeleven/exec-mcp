@@ -1,0 +1,11 @@
+#!/sbin/openrc-run
+name="sni-router"
+description="TLS SNI router for port 443"
+command="/usr/local/bin/sni-router"
+command_args="-config /etc/sni-router/config.json"
+supervisor="supervise-daemon"
+respawn_delay=2
+capabilities="^cap_net_bind_service"
+output_log="/var/log/sni-router.log"
+error_log="/var/log/sni-router.log"
+depend() { need net; after firewall; }

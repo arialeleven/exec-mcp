@@ -1,0 +1,14 @@
+<Project>
+  <PropertyGroup>
+    <Version>0.1.0</Version>
+    <Authors>arial</Authors>
+    <Copyright>Copyright 2026 arial</Copyright>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/arialeleven/exec-mcp</RepositoryUrl>
+    <Product>exec-mcp</Product>
+    <Description>MCP server with Claude Code-style coding tools, script tools and plugins, for Claude Code, Claude Desktop and claude.ai.</Description>
+    <LangVersion>latest</LangVersion>
+    <Deterministic>true</Deterministic>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+</Project>

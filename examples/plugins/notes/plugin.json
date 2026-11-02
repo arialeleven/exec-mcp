@@ -1,0 +1,17 @@
+{
+  "name": "notes",
+  "version": "0.1.0",
+  "apiVersion": "^0.1",
+  "description": "Persistent notes plus a few demos of ctx: state, cache, fs, fetch, artifacts.",
+  "runtime": { "type": "node", "entry": "index.mjs" },
+  "permissions": {
+    "net": { "allow": ["registry.npmjs.org:443"] },
+    "fs": { "read": ["${workspace}/**"], "write": ["${artifacts}/**"] },
+    "exec": ["git"],
+    "secrets": [],
+    "llm": []
+  },
+  "config": { "type": "object", "properties": { "maxNotes": { "type": "integer", "default": 100, "minimum": 1 } } },
+  "exposure": { "namespace": "notes", "mcp": "deferred", "sandbox": true },
+  "limits": { "timeoutMs": 5000, "maxOutputTokens": 500, "concurrency": 2, "ratePerMin": 600 }
+}

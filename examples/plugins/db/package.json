@@ -1,0 +1,1 @@
+{ "name": "exec-mcp-plugin-db", "version": "0.3.0", "type": "module", "private": true, "dependencies": { "pg": "^8.13.0" } }

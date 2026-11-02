@@ -1,0 +1,10 @@
+{
+  "name": "memory",
+  "version": "0.1.0",
+  "apiVersion": "^0.1",
+  "description": "Wraps the reference MCP knowledge-graph memory server as a plugin (runtime: mcp).",
+  "runtime": { "type": "mcp", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-memory"], "env": { "MEMORY_FILE_PATH": "${cache}/memory.jsonl" } },
+  "permissions": {},
+  "exposure": { "namespace": "memory", "mcp": "deferred", "sandbox": true },
+  "limits": { "timeoutMs": 60000, "maxOutputTokens": 2000 }
+}

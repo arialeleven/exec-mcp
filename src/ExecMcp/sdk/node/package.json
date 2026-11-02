@@ -1,0 +1,11 @@
+{
+  "name": "@exec-mcp/plugin-sdk",
+  "version": "0.1.0",
+  "description": "SDK for exec-mcp plugins (plugin spec v0.1)",
+  "type": "module",
+  "main": "index.mjs",
+  "types": "index.d.ts",
+  "exports": { ".": { "types": "./index.d.ts", "default": "./index.mjs" } },
+  "dependencies": { "zod": "^4.1.0" },
+  "license": "Apache-2.0"
+}

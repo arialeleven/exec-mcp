@@ -1,0 +1,57 @@
+name: release
+
+# Publish a release by pushing a tag that matches <Version> in Directory.Build.props:
+#   git tag v0.1.0 && git push origin v0.1.0
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Tag matches the project version
+        run: |
+          v=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' Directory.Build.props)
+          [ "v$v" = "$GITHUB_REF_NAME" ] || { echo "::error::tag $GITHUB_REF_NAME does not match version $v"; exit 1; }
+
+      - name: Test and build
+        run: ./build.sh
+
+      - name: Smoke test through the installer on Alpine
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src alpine:3.22 sh -c '
+            apk add --no-cache python3 curl >/dev/null && sh install.sh --from /src/dist &&
+            python3 tests/e2e/stdio_check.py /usr/local/bin/exec-mcp'
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            awk '/^## /{n++; next} n==1' CHANGELOG.md
+            echo
+            echo "### Install or update"
+            echo '```sh'
+            echo "curl -fsSL https://github.com/$GITHUB_REPOSITORY/releases/latest/download/install.sh | sh"
+            echo '```'
+            echo "One archive for every Linux (x64/arm64, glibc/musl). The installer adds a private .NET 10 runtime when the machine has none."
+          } > /tmp/notes.md
+          prerelease=""
+          case "$GITHUB_REF_NAME" in *-*) prerelease="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" dist/exec-mcp.tar.gz dist/install.sh dist/SHA256SUMS \
+            --title "exec-mcp ${GITHUB_REF_NAME#v}" --notes-file /tmp/notes.md $prerelease

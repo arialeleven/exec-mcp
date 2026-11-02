@@ -1,0 +1,28 @@
+{
+  "$schema": "https://exec-mcp.dev/schema/plugin-0.1.json",
+  "name": "db",
+  "version": "0.3.0",
+  "apiVersion": "^0.1",
+  "description": "Read-only Postgres access: schema, queries, EXPLAIN.",
+  "runtime": { "type": "node", "entry": "index.js" },
+
+  "permissions": {
+    "net":     { "allow": ["localhost:5432"] },
+    "fs":      { "read": ["${workspace}/**"], "write": ["${cache}/**", "${artifacts}/**"] },
+    "exec":    [],
+    "secrets": ["DATABASE_URL"],
+    "llm":     []
+  },
+
+  "config": {
+    "type": "object",
+    "properties": {
+      "maxRows":            { "type": "integer", "default": 200 },
+      "statementTimeoutMs": { "type": "integer", "default": 10000 }
+    }
+  },
+
+  "exposure":  { "namespace": "db", "mcp": "deferred", "sandbox": true },
+  "limits":    { "timeoutMs": 30000, "maxOutputTokens": 4000, "concurrency": 4, "ratePerMin": 120 },
+  "dependsOn": []
+}

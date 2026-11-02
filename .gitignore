@@ -1,0 +1,13 @@
+bin/
+obj/
+dist/
+out/
+*.user
+.vs/
+.idea/
+__pycache__/
+node_modules/
+examples/plugins/*/tools.json
+.exec-mcp/
+TestResults/
+deploy/sni-router/sni-router

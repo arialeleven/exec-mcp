@@ -1,0 +1,10 @@
+{
+  "name": "wordcount",
+  "version": "0.1.0",
+  "apiVersion": "^0.1",
+  "description": "Text statistics (Python runtime example).",
+  "runtime": { "type": "python", "entry": "plugin.py" },
+  "permissions": { "fs": { "read": ["${workspace}/**"] } },
+  "exposure": { "namespace": "text", "mcp": "eager", "sandbox": true },
+  "limits": { "timeoutMs": 10000, "maxOutputTokens": 1000, "concurrency": 4, "ratePerMin": 600 }
+}

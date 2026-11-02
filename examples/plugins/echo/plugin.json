@@ -1,0 +1,10 @@
+{
+  "name": "echo",
+  "version": "0.1.0",
+  "apiVersion": "^0.1",
+  "description": "Minimal stdio-runtime plugin without any SDK: speaks the protocol directly.",
+  "runtime": { "type": "stdio", "command": "python3", "args": ["${plugin}/echo.py"] },
+  "permissions": {},
+  "exposure": { "mcp": "deferred", "sandbox": true },
+  "limits": { "timeoutMs": 5000, "maxOutputTokens": 200 }
+}
