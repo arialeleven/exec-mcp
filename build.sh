@@ -38,7 +38,9 @@ cp -r third_party "$out/"
 mkdir -p "$out/examples" "$out/deploy"
 cp -r examples/tools examples/plugins "$out/examples/"
 cp -r deploy/openrc deploy/systemd deploy/config.example.json "$out/deploy/"
-find "$out/examples" -name node_modules -prune -exec rm -rf {} + -o -name tools.json -delete
+# Two passes: GNU find rejects -prune together with -delete.
+find "$out/examples" -type d -name node_modules -prune -exec rm -rf {} +
+find "$out/examples" -name tools.json -exec rm -f {} +
 
 tar -C "$stage" -czf "$DIST/exec-mcp.tar.gz" exec-mcp
 rm -rf "$stage"
